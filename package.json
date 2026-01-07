@@ -1,0 +1,67 @@
+{
+  "version": "0.3.2",
+  "name": "humanmade",
+  "description": "a project with donauwelle",
+  "keywords": [
+    "typescript",
+    "express",
+    "rest",
+    "api",
+    "framework",
+    "decorators",
+    "openapi",
+    "swagger",
+    "auth",
+    "donau",
+    "react",
+    "elbe-ui"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RobinNaumann/donauwelle.git"
+  },
+  "license": "MIT",
+  "module": "src/app.server.ts",
+  "type": "module",
+  "scripts": {
+    "deploy": "bun run --env-file .env.production deploy:_with_env",
+    "deploy:_with_env": "docker build -t $DOCKER_PACKAGE_NAME . && docker push $DOCKER_PACKAGE_NAME",
+    "build:client": "vite build --config config/vite.config.client.ts",
+    "build:server": "vite build --config config/vite.config.server.ts",
+    "build": "rm -rf ./dist && bun run build:client && bun run build:server && cp .env.production ./dist/.env",
+    "serve:server": "bun run build:server && bun --env-file='.env.development' dist/server/app.server.js",
+    "serve:dev": "bun run conc 'bun run serve:server' 'vite --config config/vite.config.client.ts' -n 'server,client' -c 'cyan,magenta' -k",
+    "serve:prod": "bun run build && (cd dist && bun --env-file='.env' server/app.server.js)",
+    "serve": "bun i && bun run serve:dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/bun": "^1.3.5",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "eslint": "^9.39.2",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^16.5.0",
+    "typescript-eslint": "^8.50.0",
+    "@vitejs/plugin-react": "^5.1.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "@types/react-dom": "^19.2.3",
+    "concurrently": "^9.2.1",
+    "donau": "1.0.12",
+    "elbe-ui": "^2.0.3",
+    "express": "^5.2.1",
+    "jiti": "^2.6.1",
+    "kolorist": "^1.8.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "vite": "^7.3.0"
+  }
+}

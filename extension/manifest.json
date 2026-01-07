@@ -1,0 +1,22 @@
+{
+    "name": "humanmade",
+    "action": {},
+    "manifest_version": 3,
+    "version": "0.2",
+    "description": "Turns the page red when you click the icon",
+    "permissions": [
+        "activeTab",
+        "scripting"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://*/"
+            ],
+            "js": [
+                "content-script.js"
+            ],
+            "run_at": "document_end"
+        }
+    ]
+}
