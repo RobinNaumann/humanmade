@@ -1,5 +1,12 @@
-import { schema } from "../shared/m_schema.shared";
+import { err } from "donau/server";
+import { schema, ScoreModel } from "../shared/m_schema.shared";
 import { DbService } from "./s_db.server";
+
+function _starClamped(v: any) {
+  const n = Number.parseFloat(v);
+  if (isNaN(n)) return null;
+  return Math.min(4, Math.max(0, n));
+}
 
 function _toTiny(timestamp: number): number {
   // convert to a smaller integer representation: hours epoch
@@ -14,23 +21,23 @@ function _fromTiny(tiny: number): number {
 export class StorageService {
   constructor(public readonly db: DbService<typeof schema>) {}
 
-  async addOpinion(
+  async addRating(
     source: string,
-    o: Omit<typeof schema.opinion, "id" | "timestamp" | "source">
+    r: Omit<typeof schema.rating, "id" | "timestamp" | "source">
   ): Promise<number> {
     const nowTiny = _toTiny(Date.now());
 
     // check if opinion is valid
-    if (!o.type || !o.target || !o.rating || !o.author) {
-      throw new Error("Invalid opinion data");
+    if (!r.type || !r.target || !r.author) {
+      throw err.badRequest("Invalid opinion data");
     }
 
     //check if the same IP has already rated this target recently
-    const existingCount = await this.db.count("opinion", {
+    const existingCount = this.db.count("rating", {
       where: [
-        ["type", "=", o.type],
-        ["target", "=", o.target],
-        ["author", "=", o.author],
+        ["type", "=", r.type],
+        ["target", "=", r.target],
+        ["author", "=", r.author],
         [
           "timestamp",
           ">",
@@ -39,32 +46,81 @@ export class StorageService {
       ],
     });
     if (existingCount > 0) {
-      throw new Error("You have already rated this target recently.");
+      throw err.tooManyRequests("You have already rated this target recently.");
     }
 
-    return this.db.insert("opinion", {
-      ...o,
+    const row: Omit<typeof schema.rating, "id"> = {
+      type: r.type,
+      target: r.target,
+      ai_voice: _starClamped(r.ai_voice),
+      ai_visual: _starClamped(r.ai_visual),
+      ai_text: _starClamped(r.ai_text),
       source: source,
       timestamp: nowTiny,
-    });
+      author: r.author,
+    };
+
+    return this.db.insert("rating", row);
   }
 
-  async removeOpinion(id: number): Promise<void> {
-    await this.db.delete("opinion", {
+  async removeRating(id: number): Promise<void> {
+    this.db.delete("rating", {
       where: [["id", "=", id]],
     });
   }
 
-  async listOpinion(
+  async listRating(
     type: string,
     target?: string
-  ): Promise<(typeof schema.opinion)[]> {
-    const opinions = await this.db.list("opinion", {
+  ): Promise<(typeof schema.rating)[]> {
+    const ratings = this.db.list("rating", {
       where: [["type", "=", type], target ? ["target", "=", target] : null],
     });
-    return opinions.map((o) => ({
-      ...o,
-      timestamp: _fromTiny(o.timestamp),
+    return ratings.map((r) => ({
+      ...r,
+      timestamp: _fromTiny(r.timestamp),
+    }));
+  }
+
+  async listTargetSummary(
+    type: string,
+    target: string | null,
+    userId: string | null
+  ): Promise<ScoreModel[]> {
+    const fields: (keyof ScoreModel["rating"])[] = [
+      "ai_voice",
+      "ai_visual",
+      "ai_text",
+    ];
+
+    const summaries = this.db.listComputed("rating", {
+      select: [
+        "target",
+        "COUNT(*) as count",
+        ...fields.flatMap((f) => [
+          `SUM(${f}) as ${f}_t`,
+          `COUNT(${f}) as ${f}_c`,
+        ]),
+        `SUM(CASE WHEN author='${
+          userId ?? ""
+        }' THEN 1 ELSE 0 END) as user_rated`,
+      ],
+      where: [["type", "=", type], target ? ["target", "=", target] : null],
+      groupBy: target ? undefined : ["target"],
+    });
+
+    return summaries.map((r) => ({
+      meta: {
+        type: type,
+        target: r.target,
+      },
+      rating: fields.reduce((acc, f) => {
+        const count = r[`${f}_c`] as number;
+        const total = r[`${f}_t`] as number;
+        acc[f] = count > 0 ? total / count : null;
+        return acc;
+      }, {} as ScoreModel["rating"]),
+      user_rated: userId != null && r.user_rated > 0,
     }));
   }
 
@@ -72,30 +128,10 @@ export class StorageService {
     type: string,
     target: string,
     userId: string | null // to check if it was rated by this user
-  ): Promise<{
-    ratings: { rating: string; count: number }[];
-    userRated: boolean;
-  }> {
-    const ratings = await this.db.listComputed("opinion", {
-      select: [
-        "rating",
-        "COUNT(*) as count",
-        `SUM(CASE WHEN author='${userId ?? ""}' THEN 1 ELSE 0 END) as rated`,
-      ],
-      where: [
-        ["type", "=", type],
-        ["target", "=", target],
-      ],
-      groupBy: ["rating"],
-    });
-
-    return {
-      ratings: ratings.map((r) => ({
-        rating: r.rating,
-        count: r.count,
-      })),
-      userRated: userId != null && ratings.some((r) => r.rated > 0),
-    };
+  ): Promise<ScoreModel> {
+    const rows = await this.listTargetSummary(type, target, userId);
+    if (rows.length > 0) return rows[0];
+    throw err.notFound("No ratings found for this target");
   }
 
   // ========= USER MANAGEMENT ==========
@@ -128,13 +164,13 @@ export class StorageService {
   }
 
   async deleteUser(id: string): Promise<void> {
-    await this.db.delete("user", {
+    this.db.delete("user", {
       where: [["id", "=", id]],
     });
   }
 
   async getUser(id: string): Promise<typeof schema.user | null> {
-    const users = await this.db.list("user", {
+    const users = this.db.list("user", {
       where: [["id", "=", id]],
     });
     return users.length > 0 ? users[0] : null;

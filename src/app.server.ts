@@ -9,6 +9,7 @@ import {
   logger,
   parameter,
   route,
+  sendError,
   serveFrontend,
 } from "donau/server";
 import { handleServerCalls } from "donau/servercalls/server";
@@ -22,12 +23,14 @@ const jwtAuth = new JWTAuth({
   secretKey: serverconfig.auth.jwtSecret,
   // remove onSignUp if you don't want to allow sign up
   onUserCreate: async (user, pwHash) => {
-    console.log("Creating user", user, pwHash);
     await services.storage.setUser(user, pwHash, "user");
   },
   // this provides a rich user object to your routes
   getUser: async (username) => {
-    return services.storage.getUser(username);
+    return {
+      ...(await services.storage.getUser(username)),
+      password_hash: "***",
+    };
   },
   // load the password hash from your database
   getPasswordHash: async (username) => {
@@ -37,28 +40,21 @@ const jwtAuth = new JWTAuth({
 });
 
 const serverCallRoutes = handleServerCalls(serverCallDefinitions, {
-  listOpinion: async ({ type, target }) => {
-    const opinions = await services.storage.listOpinion(type, target);
-    return { opinions };
-  },
-  deleteOpinion: async ({ id }) => {
-    await services.storage.removeOpinion(id);
-    return {};
-  },
   listUsers: async () => {
     const users = await services.storage.listUsers();
     return { users };
   },
-  deleteUser: async ({ id }) => {
-    await services.storage.deleteUser(id);
-    return {};
+  listScores: async ({ type }) => {
+    return {
+      scores: await services.storage.listTargetSummary(type, null, null),
+    };
   },
 });
 
 donauServerRun(
   PORT,
   {
-    cors: { origin: "http://localhost:5173", credentials: true },
+    cors: { origin: serverconfig.cors.origin, credentials: true },
     auth: jwtAuth,
     info: {
       title: appInfo.name + " API",
@@ -69,7 +65,21 @@ donauServerRun(
       ...serverCallRoutes,
       route("/rate", {
         method: "post",
-        description: "Adds a opinion for a target",
+        description: `submit a rating for a target
+
+## example:
+\`\`\`
+{
+  "type": "yc",                         // youtube channel
+  "target": "UC_x5XG1OV2P6uZZ5FSM9Ttw", // channel id
+  "author": "user123",                  // your user id
+  "rating": {                           // ratings (0-4, null = no rating)
+    "ai_voice": 4,
+    "ai_visual": 3,
+    "ai_text": 2
+  }
+}
+\`\`\``,
 
         parameters: {
           body: parameter.body({
@@ -77,32 +87,32 @@ donauServerRun(
             properties: {
               type: { type: "string", required: true },
               target: { type: "string", required: true },
-              rating: { type: "string", required: true },
+              rating: { type: "object", required: true },
               author: { type: "string", required: true },
             },
           }),
         },
         handler: async (req, res) => {
-          await services.spamDetect.spamGuard(req);
-          const ip = services.spamDetect.ip(req);
+          try {
+            await services.spamDetect.spamGuard(req);
+            const ip = services.spamDetect.ip(req);
 
-          services.storage.addOpinion(ip, {
-            type: req.body?.type,
-            target: req.body?.target,
-            rating: req.body?.rating.rating,
-            author: req.body?.author,
-          });
-
-          /*const { type, target, rating, author } = req.body;
-          const opinionData: Omit<typeof schema.opinion, "id"> = {
-            type,
-            target,
-            rating: rating.rating,
-            author: rating.author,
-          };
-          await storageService.addOpinion(opinionData);
-          res.status(201).send({});*/
-          res.status(200).send({ error: "Not implemented" });
+            await services.storage.addRating(ip, {
+              type: req.body?.type,
+              target: req.body?.target,
+              author: req.body?.author,
+              ai_voice: req.body?.rating?.ai_voice ?? null,
+              ai_visual: req.body?.rating?.ai_visual ?? null,
+              ai_text: req.body?.rating?.ai_text ?? null,
+            });
+            res.status(200).send({ success: true });
+          } catch (error: any) {
+            if (error?.code) return sendError(res, error);
+            console.error("[/rate] unexpected error: ", error);
+            res
+              .status(400)
+              .send({ success: false, error: "could not add opinion" });
+          }
         },
       }),
       route("/score", {
@@ -114,19 +124,11 @@ donauServerRun(
           author: parameter.query({ type: "string", optional: true }),
         },
         worker: async ({ type, target, author }) => {
-          const rating = await services.storage.getTargetSummary(
+          return await services.storage.getTargetSummary(
             type,
             target,
             author ?? null
           );
-          return {
-            meta: {
-              type: type,
-              target: target,
-            },
-            ratings: rating.ratings,
-            youRated: rating.userRated,
-          };
         },
       }),
     ],
@@ -142,7 +144,7 @@ async function createAdminUser() {
     return;
   }
   await jwtAuth.createUser(creds[0], creds[1]);
-  logger.info(`admin user '${creds[0]}' created`);
+  console.log(`admin user '${creds[0]}' created`);
 }
 
 createAdminUser();

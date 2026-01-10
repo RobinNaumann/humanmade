@@ -1,22 +1,22 @@
 import { useServerCallsWithAuth } from "donau/servercalls/client";
 import { useServerChannels } from "donau/serverchannels/client";
-import "elbe-ui/dist/elbe.css";
 
 import {
   Button,
-  Column,
   ElbeApp,
   Icons,
   makeL10n,
   makeThemeContext,
-  Page,
   renderElbe,
   Route,
 } from "elbe-ui";
 import { StrictMode, useState } from "react";
+import { AuthProvider } from "./bit/b_auth";
 import { serverCallDefinitions } from "./shared/calls.shared";
-import { schema } from "./shared/m_schema.shared";
-import { AppFooter } from "./view/v_footer";
+import { UserModel } from "./shared/m_schema.shared";
+import { AdminPage } from "./view/v_admin";
+import { AppFooter } from "./view/v_branding";
+import { Home } from "./view/v_home";
 
 export const { serverChannels } = useServerChannels({
   port: import.meta.env.VITE_API_PORT,
@@ -28,7 +28,7 @@ export const { makeServerCall, serverAuth } = useServerCallsWithAuth(
     port: import.meta.env.VITE_API_PORT,
     auth: {
       loginArgs: { username: "", password: "" },
-      userModel: { typeof: schema.user },
+      userModel: {} as UserModel,
     },
   }
 );
@@ -51,85 +51,50 @@ function App() {
 
   return (
     <L10n.L10n>
-      <ElbeApp
-        title={"humanmade"}
-        key={dark ? "dark" : "light"}
-        themeContext={_themeContext}
-        themeSelector={(c) => ({
-          color: {
-            ...c.color,
-            selection: {
-              ...c.color.selection,
-              mode: dark ? "dark" : "light",
-              contrast: highVis ? "highvis" : "normal",
-            },
-          },
-        })}
-        icons={{
-          logo: "/assets/humanmade_light.png",
-          logoDark: "/assets/humanmade_dark.png",
-        }}
-        globalActions={[
-          <Button.plain
-            label="High Visibility"
-            ariaLabel="toggle high visibility mode"
-            icon={highVis ? Icons.Paintbrush : Icons.Contrast}
-            onTap={() => setHighVis(!highVis)}
-          />,
-          <Button.plain
-            label="Dark Mode"
-            ariaLabel="toggle dark mode"
-            icon={dark ? Icons.Sun : Icons.Moon}
-            onTap={() => setDark(!dark)}
-          />,
-        ]}
-      >
-        <Route path="/">
-          <_Home />
-        </Route>
-      </ElbeApp>
-    </L10n.L10n>
-  );
-}
-
-function _Home() {
-  return (
-    <Page title="" narrow footer={<AppFooter />} actions={[]}>
-      <Column gap={3}>
-        <Button.major
-          ariaLabel="add opinion"
-          label="hello"
-          onTap={async () => {
-            fetch("http://localhost:3000/api/rate", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
+      <AuthProvider>
+        <ElbeApp
+          title={"humanmade"}
+          key={dark ? "dark" : "light"}
+          themeContext={_themeContext}
+          themeSelector={(c) => ({
+            color: {
+              ...c.color,
+              selection: {
+                ...c.color.selection,
+                mode: dark ? "dark" : "light",
+                contrast: highVis ? "highvis" : "normal",
               },
-              body: JSON.stringify({
-                type: "channel",
-                target: "donauwelle",
-                rating: { rating: "positive", author: "anonymous" },
-              }),
-            });
+            },
+          })}
+          icons={{
+            logo: "/assets/humanmade_light.png",
+            logoDark: "/assets/humanmade_dark.png",
           }}
-        />
-        <Button.minor
-          ariaLabel="add opinion"
-          label="login"
-          onTap={async () => {
-            await serverAuth.login({
-              username: "admin",
-              password: "admin",
-            });
-          }}
-        />
-        <i>
-          Have fun ☺️
-          <br />
-          yours, Robin
-        </i>
-      </Column>
-    </Page>
+          footer={<AppFooter />}
+          globalActions={[
+            <Button.plain
+              label="High Visibility"
+              ariaLabel="toggle high visibility mode"
+              icon={highVis ? Icons.Paintbrush : Icons.Contrast}
+              onTap={() => setHighVis(!highVis)}
+            />,
+            <Button.plain
+              label="Dark Mode"
+              ariaLabel="toggle dark mode"
+              icon={dark ? Icons.Sun : Icons.Moon}
+              onTap={() => setDark(!dark)}
+            />,
+          ]}
+        >
+          <Route path="/">
+            <Home />
+          </Route>
+          <Route path="/admin">
+            <AdminPage />
+          </Route>
+        </ElbeApp>
+      </AuthProvider>
+    </L10n.L10n>
   );
 }
 

@@ -146,7 +146,7 @@ export default defineConfig([
     },
     extends: [
       //"js/recommended",
-      //  "preact"
+      //  "react"
     ],
     rules: {
       ...elzpack.recommended,

@@ -1,12 +1,14 @@
 import { serverCall } from "donau/servercalls/shared";
-import { schema } from "./m_schema.shared";
+import { schema, ScoreModel } from "./m_schema.shared";
 export const serverCallDefinitions = {
-  listOpinion: serverCall<
+  listScores: serverCall<{ type: string }, { scores: ScoreModel[] }>({
+    auth: true,
+  }),
+  listUsers: serverCall<{}, { users: (typeof schema.user)[] }>({ auth: true }),
+  //deleteOpinion: serverCall<{ id: number }, {}>({ auth: true }),
+  //deleteUser: serverCall<{ id: string }, {}>({ auth: true }),
+  /*listOpinion: serverCall<
     { type: string; target?: string },
     { opinions: (typeof schema.opinion)[] }
-  >(),
-
-  deleteOpinion: serverCall<{ id: number }, {}>(),
-  listUsers: serverCall<{}, { users: (typeof schema.user)[] }>(),
-  deleteUser: serverCall<{ id: string }, {}>(),
+  >({ auth: true }),*/
 };

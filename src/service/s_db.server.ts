@@ -41,7 +41,7 @@ export class DbService<S extends DbSchemaBase> {
   ): void {
     if (!row) throw new Error("No row data provided");
 
-    const fields = this._getColumns(table, true);
+    const fields = this._getColumns(table, true).filter((f) => f in row);
     const setClauses = fields.map((f) => `${String(f)} = ?`).join(", ");
     let query = `UPDATE ${String(table)} SET ${setClauses}`;
     const params: any[] = fields.map((f) => row[f]);

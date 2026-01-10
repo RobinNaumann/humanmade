@@ -2,16 +2,40 @@
     "name": "humanmade",
     "action": {},
     "manifest_version": 3,
-    "version": "0.2",
-    "description": "Turns the page red when you click the icon",
+    "icons": {
+        "16": "/assets/favicon.png",
+        "48": "/assets/favicon.png",
+        "128": "/assets/favicon.png"
+    },
+    "version": "0.3",
+    "description": "Crowdsourced labeling of AI-generated content on YouTube. Highlight channels made by humans for humans.",
     "permissions": [
         "activeTab",
         "scripting"
     ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "assets/favicon.png",
+                "assets/shape.svg",
+                "assets/humanmade_dark.png",
+                "assets/icons/hand.svg",
+                "assets/icons/brain.svg",
+                "assets/icons/bot.svg",
+                "assets/icons/github.svg",
+                "assets/icons/x.svg"
+            ],
+            "matches": [
+                "https://youtube.com/*",
+                "https://www.youtube.com/*"
+            ]
+        }
+    ],
     "content_scripts": [
         {
             "matches": [
-                "https://*/"
+                "https://youtube.com/*",
+                "https://www.youtube.com/*"
             ],
             "js": [
                 "content-script.js"

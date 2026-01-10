@@ -1,11 +1,13 @@
 import { Dict } from "./util.shared";
 
-export type DbSchemaBase = Dict<Dict<string | number | boolean>>;
+export type DbSchemaBase = Dict<Dict<string | number | boolean | null>>;
 type DbTypeOptions = "PRIMARY" | "AUTOINCREMENT" | "NULLABLE" | "UNIQUE";
 
 const dbTypes = {
   INTEGER: (...o: DbTypeOptions[]) => ["INTEGER", ...o] as any as number,
   TINYINT: (...o: DbTypeOptions[]) => ["TINYINT", ...o] as any as number,
+  TINYINT_NULL: (...o: DbTypeOptions[]) =>
+    ["TINYINT", ...o] as any as number | null,
   BIGINT: (...o: DbTypeOptions[]) => ["BIGINT", ...o] as any as number,
   VARCHAR30: (...o: DbTypeOptions[]) => [`VARCHAR(30)`, ...o] as any as string,
   BOOLEAN: (...o: DbTypeOptions[]) => ["BOOLEAN", ...o] as any as boolean,
@@ -36,14 +38,32 @@ export const schema = {
     role: dbTypes.VARCHAR30(),
   },
 
-  opinion: {
+  rating: {
     id: dbTypes.INTEGER("PRIMARY", "AUTOINCREMENT"),
     type: dbTypes.VARCHAR30(),
     target: dbTypes.VARCHAR30(),
-    rating: dbTypes.VARCHAR30(),
     // metadata
     author: dbTypes.VARCHAR30(),
     source: dbTypes.VARCHAR30(),
     timestamp: dbTypes.INTEGER(),
+    // rating data (0-4 likert scales)
+    ai_voice: dbTypes.TINYINT_NULL("NULLABLE"),
+    ai_visual: dbTypes.TINYINT_NULL("NULLABLE"),
+    ai_text: dbTypes.TINYINT_NULL("NULLABLE"),
   },
+};
+
+export type UserModel = Omit<typeof schema.user, "password_hash">;
+
+export type ScoreModel = {
+  meta: {
+    type: string;
+    target: string;
+  };
+  rating: {
+    ai_voice: number | null;
+    ai_visual: number | null;
+    ai_text: number | null;
+  };
+  user_rated: boolean;
 };
