@@ -43,11 +43,11 @@ export const schema = {
     type: dbTypes.VARCHAR30(),
     target: dbTypes.VARCHAR30(),
     // metadata
-    author: dbTypes.VARCHAR30(),
+    author: dbTypes.VARCHAR30("NULLABLE"),
     source: dbTypes.VARCHAR30(),
     timestamp: dbTypes.INTEGER(),
     // rating data (0-4 likert scales)
-    ai_voice: dbTypes.TINYINT_NULL("NULLABLE"),
+    ai_audio: dbTypes.TINYINT_NULL("NULLABLE"),
     ai_visual: dbTypes.TINYINT_NULL("NULLABLE"),
     ai_text: dbTypes.TINYINT_NULL("NULLABLE"),
   },
@@ -60,8 +60,8 @@ export type ScoreModel = {
     type: string;
     target: string;
   };
-  rating: {
-    ai_voice: number | null;
+  score: {
+    ai_audio: number | null;
     ai_visual: number | null;
     ai_text: number | null;
   };

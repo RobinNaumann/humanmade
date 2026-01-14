@@ -54,7 +54,14 @@ const serverCallRoutes = handleServerCalls(serverCallDefinitions, {
 donauServerRun(
   PORT,
   {
-    cors: { origin: serverconfig.cors.origin, credentials: true },
+    cors: {
+      origin: [
+        serverconfig.cors.origin,
+        "https://youtube.com",
+        "https://www.youtube.com",
+      ],
+      credentials: true,
+    },
     auth: jwtAuth,
     info: {
       title: appInfo.name + " API",
@@ -63,6 +70,7 @@ donauServerRun(
     },
     routes: [
       ...serverCallRoutes,
+      // allow cors preflight for all routes
       route("/rate", {
         method: "post",
         description: `submit a rating for a target
@@ -101,39 +109,75 @@ donauServerRun(
               type: req.body?.type,
               target: req.body?.target,
               author: req.body?.author,
-              ai_voice: req.body?.rating?.ai_voice ?? null,
+              ai_audio: req.body?.rating?.ai_audio ?? null,
               ai_visual: req.body?.rating?.ai_visual ?? null,
               ai_text: req.body?.rating?.ai_text ?? null,
             });
             res.status(200).send({ success: true });
           } catch (error: any) {
-            if (error?.code) return sendError(res, error);
             console.error("[/rate] unexpected error: ", error);
-            res
-              .status(400)
-              .send({ success: false, error: "could not add opinion" });
+            return sendError(res, error);
           }
         },
       }),
       route("/score", {
         method: "get",
-        description: "returns a greeting to you",
+        description: "returns a summary score for a target",
         parameters: {
           type: parameter.query({ type: "string" }),
           target: parameter.query({ type: "string" }),
           author: parameter.query({ type: "string", optional: true }),
         },
-        worker: async ({ type, target, author }) => {
-          return await services.storage.getTargetSummary(
-            type,
-            target,
-            author ?? null
-          );
+        handler: async (req, res) => {
+          try {
+            const ip = services.spamDetect.ip(req);
+            const { type, target } = req.query;
+            const score = await services.storage.getTargetSummary(
+              type + "",
+              target + "",
+              ip
+            );
+            res.status(200).send(score);
+          } catch (error: any) {
+            sendError(res, error);
+          }
         },
       }),
     ],
   },
-  [process.env.SERVE_FRONTEND === "true" ? serveFrontend("client") : null]
+  [process.env.SERVE_FRONTEND === "true" ? serveFrontend("client") : null],
+  [
+    /*(app) => {
+      app.use((req, res, next) => {
+        const isPublic = req.path.startsWith("/api/public/");
+        // allow credentials for non-public routes
+        res.header(
+          "Access-Control-Allow-Credentials",
+          isPublic ? "false" : "true"
+        );
+
+        res.header(
+          "Access-Control-Allow-Origin",
+          isPublic ? "*" : serverconfig.cors.origin
+        );
+        res.header(
+          "Access-Control-Allow-Headers",
+          isPublic
+            ? "Origin, X-Requested-With, Content-Type, Accept"
+            : "Authorization, Origin, X-Requested-With, Content-Type, Accept"
+        );
+        res.header(
+          "Access-Control-Allow-Methods",
+          "GET, POST, PUT, DELETE, OPTIONS"
+        );
+        if (isPublic && req.method === "OPTIONS") {
+          return res.status(200).end();
+        }
+
+        next();
+      });
+    },*/
+  ]
 );
 
 // set admin user on first run

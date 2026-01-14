@@ -63,11 +63,9 @@ function _ScoresList() {
             <Row>
               <Text bold v={s.meta.target} />
               <FlexSpace />
-              <Text v={`text: ${s.rating.ai_text?.toPrecision(1) ?? "-"}`} />
-              <Text v={`voice: ${s.rating.ai_voice?.toPrecision(1) ?? "-"}`} />
-              <Text
-                v={`visual: ${s.rating.ai_visual?.toPrecision(1) ?? "-"}`}
-              />
+              <Text v={`text: ${s.score.ai_text?.toPrecision(1) ?? "-"}`} />
+              <Text v={`audio: ${s.score.ai_audio?.toPrecision(1) ?? "-"}`} />
+              <Text v={`visual: ${s.score.ai_visual?.toPrecision(1) ?? "-"}`} />
             </Row>
           </Card>
         ))}

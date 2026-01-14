@@ -1,34 +1,21 @@
-# donauwelle _<img src="./public/donauwelle.png" width="40" align="right"/>_
+# humanMade _<img src="./public/assets/favicon.png" width="40" align="right"/>_
 
-donauwelle is a small, open-source framework for writing web apps and
-their server/backend code in one unified project. It is build for
-[Bun](https://bun.sh) and uses [donau](https://npmjs.com/package/donau) for connectivity. It is configured to
-be easily deployable as a docker container.
-<br />
-It's goal is ease-of-use. It's thus mainly suitable for small projects
+A browser extension to crowdsource the labeling of AI-generated content on YouTube. Help to highlight channels made by humans for humans.
 
-#### For more information, check out the [demo](https://donauwelle.robbb.in)
+## features
 
-### Screenshots
+- adds an icon to YouTube channel pages to indicate whether the channel is labeled as human-made
+- allows users to submit labels for channels they believe are human-made
 
-_<img src="./public/screenshot.png" width="300" />_
+_<img src="./assets/scs_1.png" width="32%"/>_
+_<img src="./assets/scs_2.png" width="32%"/>_
+_<img src="./assets/scs_3.png" width="32%"/>_
 
-### Install
+## installation
 
-1. build your app on top of this template either:
-   - using **`bun create donauwelle`** (or `npm init donauwelle`)
-   - cloning this repository (and changing the name in `package.json`)
-2. _(optional) adapt the configuration in the `.env` files_
-3. run `bun run serve` to start in development mode
-
-### Scripts
-
-the following scripts are available for development and deployment:
-
-- `bun run serve` - starts the app in development mode
-- `bun run serve:prod` - starts the app in production mode
-- `bun run build` - builds the app for production
-- `bun run deploy` - builds the app and deploys it to the docker registry (defined in `.env.production`)
+- download the extension for your browser:
+  - [chrome](https://chrome.google.com/webstore/detail/humanmade/cfplkgejblmldlnpcgghomjbgmfbibjo)
+  - [firefox](https://addons.mozilla.org/en-US/firefox/addon/humanmade/)
 
 ### contribute
 

@@ -28,7 +28,7 @@ export class StorageService {
     const nowTiny = _toTiny(Date.now());
 
     // check if opinion is valid
-    if (!r.type || !r.target || !r.author) {
+    if (!r.type || !r.target) {
       throw err.badRequest("Invalid opinion data");
     }
 
@@ -37,7 +37,7 @@ export class StorageService {
       where: [
         ["type", "=", r.type],
         ["target", "=", r.target],
-        ["author", "=", r.author],
+        ["source", "=", source],
         [
           "timestamp",
           ">",
@@ -52,7 +52,7 @@ export class StorageService {
     const row: Omit<typeof schema.rating, "id"> = {
       type: r.type,
       target: r.target,
-      ai_voice: _starClamped(r.ai_voice),
+      ai_audio: _starClamped(r.ai_audio),
       ai_visual: _starClamped(r.ai_visual),
       ai_text: _starClamped(r.ai_text),
       source: source,
@@ -85,10 +85,10 @@ export class StorageService {
   async listTargetSummary(
     type: string,
     target: string | null,
-    userId: string | null
+    source: string | null
   ): Promise<ScoreModel[]> {
-    const fields: (keyof ScoreModel["rating"])[] = [
-      "ai_voice",
+    const fields: (keyof ScoreModel["score"])[] = [
+      "ai_audio",
       "ai_visual",
       "ai_text",
     ];
@@ -101,8 +101,8 @@ export class StorageService {
           `SUM(${f}) as ${f}_t`,
           `COUNT(${f}) as ${f}_c`,
         ]),
-        `SUM(CASE WHEN author='${
-          userId ?? ""
+        `SUM(CASE WHEN source='${
+          source ?? ""
         }' THEN 1 ELSE 0 END) as user_rated`,
       ],
       where: [["type", "=", type], target ? ["target", "=", target] : null],
@@ -114,22 +114,22 @@ export class StorageService {
         type: type,
         target: r.target,
       },
-      rating: fields.reduce((acc, f) => {
+      score: fields.reduce((acc, f) => {
         const count = r[`${f}_c`] as number;
         const total = r[`${f}_t`] as number;
         acc[f] = count > 0 ? total / count : null;
         return acc;
-      }, {} as ScoreModel["rating"]),
-      user_rated: userId != null && r.user_rated > 0,
+      }, {} as ScoreModel["score"]),
+      user_rated: source != null && r.user_rated > 0,
     }));
   }
 
   async getTargetSummary(
     type: string,
     target: string,
-    userId: string | null // to check if it was rated by this user
+    source: string // to check if it was rated by this user
   ): Promise<ScoreModel> {
-    const rows = await this.listTargetSummary(type, target, userId);
+    const rows = await this.listTargetSummary(type, target, source);
     if (rows.length > 0) return rows[0];
     throw err.notFound("No ratings found for this target");
   }

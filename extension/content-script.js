@@ -1,3 +1,11 @@
+const _API_BASE_URL = "https://humanmade.robbb.in/api";
+
+const logger = {
+  info: (...args) => console.info("HUMANMADE:", ...args),
+  warn: (...args) => console.warn("HUMANMADE:", ...args),
+  error: (...args) => console.error("HUMANMADE:", ...args),
+};
+
 function TiberComponents(ctxt) {
   const theme = {
     c_accent: "#E85A53",
@@ -131,6 +139,7 @@ function TiberComponents(ctxt) {
 }
 
 function render(root, prefix, builder) {
+  let unmounted = false;
   let idCounter = 0;
   let listeners = [];
   let state = {};
@@ -138,6 +147,7 @@ function render(root, prefix, builder) {
   let _scrollCache = {};
 
   function _reRender() {
+    if (unmounted) return;
     idCounter = 0;
     listeners = [];
 
@@ -183,14 +193,16 @@ function render(root, prefix, builder) {
       }
     }
   }
-  console.log("Initial render");
   _reRender();
-  console.log("Initial render complete");
   // run the effects once after initial render
   for (const effect of [...effects]) {
-    console.warn("Running effect");
     effect();
   }
+
+  return () => {
+    unmounted = true;
+    root.innerHTML = "";
+  };
 }
 
 // ============== END OF FRAMEWORK ==============
@@ -216,12 +228,46 @@ const ratingTypes = [
   },
   // fallback
   {
-    key: "unknown",
+    key: "none",
     icon: "question.svg",
     color: "#888888ff",
     label: "Unknown / not rated",
   },
 ];
+
+function _asTypes(score) {
+  function _avgAsType(avg) {
+    if (avg == null) return null;
+    const t = Math.max(0, Math.min(2, Math.round(avg)));
+    return ratingTypes[t];
+  }
+
+  if (!score) return null;
+  const a = _avgAsType(score.ai_audio);
+  const v = _avgAsType(score.ai_visual);
+  const t = _avgAsType(score.ai_text);
+  if (!a || !v || !t) return null;
+  return { audio: a, visual: v, text: t };
+}
+
+function _scoreToType(score) {
+  if (
+    !score ||
+    score.ai_audio == null ||
+    score.ai_visual == null ||
+    score.ai_text == null
+  ) {
+    logger.warn("incomplete score, cannot determine type", score);
+    return 3;
+  }
+  return Math.max(
+    0,
+    Math.min(
+      2,
+      Math.round((score.ai_audio + score.ai_visual + score.ai_text) / 3)
+    )
+  );
+}
 
 const ids = {
   avatarBase: "humanmade-avatar-base",
@@ -229,30 +275,85 @@ const ids = {
   avatarIcon: "humanmade-avatar-icon",
 };
 
+let renderUnmount = null;
+
 window.addEventListener("load", () => {
-  console.info("HUMANMADE: content script loaded");
+  logger.info("content script loaded");
+
+  const observer = new MutationObserver((mutationsList, observer) => {
+    for (const mutation of mutationsList) {
+      if (mutation.type === "childList") {
+        logger.info("#owner element changed, re-adding channel icon");
+        renderPage();
+      }
+    }
+  });
+  renderPage();
+
+  // observe changes to the #owner element to re-add the channel icon if needed
+  setInterval(() => {
+    const elOwner = document.querySelector("#owner");
+    observer.disconnect();
+    observer.observe(elOwner, { childList: true, subtree: true });
+  }, 3000);
+});
+
+function renderPage() {
+  if (renderUnmount) {
+    renderUnmount();
+    renderUnmount = null;
+  }
   // state shape:
   // {
   //    dialogOpen: boolean,
   //
   //    channel: string,
-  //    score: {audio: number, visual: number, text: number}
+  //    score: {ai_audio: number, ai_visual: number, ai_text: number} | null,
   //
   //    userRated: boolean,
-  //    rating: {audio: 0|1|2, visual: 0|1|2, text: 0|1|2}
+  //    rating: {ai_audio: 0|1|2, ai_visual: 0|1|2, ai_text: 0|1|2}
   // }
-  const dialogRoot = document.createElement("div");
-  dialogRoot.id = "humanmade-modal-root";
-  dialogRoot.style.zIndex = "10000";
-  document.body.appendChild(dialogRoot);
+
+  let dialogRoot = document.getElementById("humanmade-modal-root");
+  if (!dialogRoot) {
+    dialogRoot = document.createElement("div");
+    dialogRoot.id = "humanmade-modal-root";
+    dialogRoot.style.zIndex = "10000";
+    document.body.appendChild(dialogRoot);
+  }
+
+  logger.info("rendering modal dialog");
+
   render(dialogRoot, "well", ({ c, state, setState, useEffect }) => {
+    function getChannelId() {
+      const elOwner = document.querySelector("#owner a");
+      return elOwner
+        ?.getAttribute("href")
+        .split("/")
+        .find((part) => part.startsWith("@"))
+        .replaceAll("@", "");
+    }
+
+    function loadScoreAndSet(channelName) {
+      if (!channelName) return;
+      networkScore(channelName, (data) => {
+        setState({ score: data.score, userRated: data.user_rated ?? false });
+        setChannelIconType(_scoreToType(data.score));
+      });
+    }
+
     useEffect(async () => {
       while (!document.querySelector("#owner")) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      console.info("HUMANMADE: page ready, adding channel icon");
+      logger.info("page ready - adding channel icon");
       addChannelIcon(() => setState({ dialogOpen: true }));
-      setChannelIconType(0);
+      setChannelIconType(3); // unknown at first
+
+      // load channel info:
+      const channelName = getChannelId();
+      setState({ channelName: channelName });
+      loadScoreAndSet(channelName);
     });
 
     function LickertScale(p) {
@@ -264,7 +365,7 @@ window.addEventListener("load", () => {
         style: "gap: 8px;",
         inner: [
           c.TextHint({
-            inner: `The ${p.label} usually are:`,
+            inner: `The ${p.label} <span style="font-weight: bold;">usually</span> are:`,
             style: "color: white;",
           }),
           c.Row({
@@ -338,15 +439,7 @@ window.addEventListener("load", () => {
     }
 
     function ScoreCard() {
-      const score = state.score;
-
-      const scores = state.score
-        ? {
-            audio: ratingTypes[score.audio] ?? ratingTypes[3],
-            visual: ratingTypes[score.visual] ?? ratingTypes[3],
-            text: ratingTypes[score.text] ?? ratingTypes[3],
-          }
-        : null;
+      const scores = _asTypes(state.score);
 
       return c.Card({
         style: "gap: 4px",
@@ -413,31 +506,31 @@ window.addEventListener("load", () => {
                   LickertScale({
                     id: "humanmade-lickert-audio",
                     label: "audio / speech",
-                    value: state.rating?.audio ?? 0,
+                    value: state.rating?.ai_audio,
                     onChange: (val) =>
                       setState({
                         ...state,
-                        rating: { ...state.rating, audio: val },
+                        rating: { ...state.rating, ai_audio: val },
                       }),
                   }),
                   LickertScale({
                     id: "humanmade-lickert-visual",
                     label: "visuals / imagery",
-                    value: state.rating?.visual ?? 0,
+                    value: state.rating?.ai_visual,
                     onChange: (val) =>
                       setState({
                         ...state,
-                        rating: { ...state.rating, visual: val },
+                        rating: { ...state.rating, ai_visual: val },
                       }),
                   }),
                   LickertScale({
                     id: "humanmade-lickert-text",
                     label: "content / script",
-                    value: state.rating?.text ?? 0,
+                    value: state.rating?.ai_text,
                     onChange: (val) =>
                       setState({
                         ...state,
-                        rating: { ...state.rating, text: val },
+                        rating: { ...state.rating, ai_text: val },
                       }),
                   }),
                 ],
@@ -445,20 +538,46 @@ window.addEventListener("load", () => {
               c.Button({
                 id: "humanmade-modal-close",
                 inner: "submit rating",
-                style: "flex: 1; margin-top: 16px",
+                style: [
+                  "flex: 1; margin-top: 16px",
+                  (state?.rating?.ai_audio ?? null) === null ||
+                  (state?.rating?.ai_visual ?? null) === null ||
+                  (state?.rating?.ai_text ?? null) === null
+                    ? "background: #888;"
+                    : "",
+                ],
 
                 onClick: () => {
-                  console.log("Submit rating clicked");
-                  setState({ dialogOpen: false });
+                  if (
+                    !state.channelName ||
+                    !state.rating ||
+                    (state.rating.ai_audio ?? null) === null ||
+                    (state.rating.ai_visual ?? null) === null ||
+                    (state.rating.ai_text ?? null) === null
+                  ) {
+                    showToast("❌ add all ratings");
+                    return;
+                  }
+
+                  networkRate(state.channelName, state.rating)
+                    .then(() => {
+                      showToast("✅ Thank you for your rating!");
+                      setState({ userRated: true, rating: null });
+                      loadScoreAndSet(state.channelName);
+                    })
+                    .catch((e) => {
+                      setState({ rating: null });
+                      logger.error("error submitting rating", e);
+                      showToast("❌ could not submit rating");
+                    });
                 },
               }),
             ],
       });
     }
 
-    console.warn("Rendering modal dialog, open =", state.dialogOpen);
-
     return c.Element({
+      onClick: () => setState({ dialogOpen: false }),
       style: [
         "position: fixed;",
         "top: 0;",
@@ -474,6 +593,9 @@ window.addEventListener("load", () => {
       ],
       inner: [
         c.Element({
+          onClick: (e) => {
+            e.stopPropagation();
+          },
           id: "humanmade-modal-dialog",
           style: [
             "font-family: Arial, Helvetica, sans-serif;",
@@ -511,22 +633,46 @@ window.addEventListener("load", () => {
       ],
     });
   });
-});
+}
+
+function showToast(message, duration = 3000) {
+  let elToast = document.getElementById("humanmade-toast");
+  if (!elToast) {
+    elToast = document.createElement("div");
+    elToast.id = "humanmade-toast";
+    elToast.style.position = "fixed";
+    elToast.style.bottom = "32px";
+    elToast.style.left = "50%";
+    elToast.style.transform = "translateX(-50%)";
+    elToast.style.background = "rgba(0,0,0,0.8)";
+    elToast.style.color = "white";
+    elToast.style.padding = "12px 24px";
+    elToast.style.borderRadius = "24px";
+    elToast.style.fontSize = "16px";
+    elToast.style.zIndex = "10003";
+    elToast.style.transition = "opacity 0.3s ease-in-out";
+    document.body.appendChild(elToast);
+  }
+  elToast.innerText = message;
+  elToast.style.opacity = "1";
+
+  setTimeout(() => {
+    elToast.style.opacity = "0";
+  }, duration);
+}
 
 function addChannelIcon(onTap) {
   if (document.querySelector(`#${ids.avatarBase}`)) return;
 
-  console.info("HUMANMADE: adding avatar circle");
-
   const elOwner = document.querySelector("#owner");
   const elAvatar = document.querySelector("#avatar");
   if (!elAvatar || !elOwner) {
-    console.warn("HUMANMADE: could not find avatar or owner element");
+    logger.warn("could not find avatar or owner element");
     return;
   }
   // get the avatar size:
   const rect = elAvatar.getBoundingClientRect();
-  const size = Math.max(Math.round(rect.width), Math.round(rect.height));
+  const size = Math.max(40, Math.round(rect.width), Math.round(rect.height));
 
   // prepend a circle before the avatar
   const elBase = document.createElement("div");
@@ -539,7 +685,7 @@ function addChannelIcon(onTap) {
   elBase.style.display = "none";
   elBase.style.position = "relative";
   elBase.addEventListener("click", (e) => {
-    console.log("HUMANMADE: avatar circle clicked");
+    logger.info("avatar circle clicked");
     e.stopPropagation();
     e.preventDefault();
     onTap?.();
@@ -580,7 +726,7 @@ function setChannelIconType(type) {
   const style = ratingTypes[type];
 
   if (!style) {
-    console.warn(`HUMANMADE: unknown avatar type "${type}"`);
+    logger.warn(`unknown avatar type "${type}"`);
     elBase.style.display = "none";
     return;
   }
@@ -590,3 +736,42 @@ function setChannelIconType(type) {
   elBack.style.color = style.color;
   elIcon.src = chrome.runtime.getURL(`/assets/icons/${style.icon}`);
 }
+
+// ===================== NETWORK INTERACTIONS =====================
+
+async function networkScore(channelId, onRes) {
+  try {
+    const res = await fetch(
+      `${_API_BASE_URL}/score/?type=yc&target=${channelId}`
+    );
+    if (!res.ok) {
+      logger.warn("error fetching channel rating, status not ok", res.status);
+      return null;
+    }
+    const data = await res.json();
+    logger.info("fetched channel rating", data);
+    onRes?.(data);
+    return data;
+  } catch (e) {
+    logger.error("error fetching channel rating", e);
+    return null;
+  }
+}
+
+async function networkRate(channelId, rating) {
+  const res = await fetch(`${_API_BASE_URL}/rate/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      type: "yc",
+      target: channelId,
+      rating: rating,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`error submitting rating, status not ok: ${res.status}`);
+  }
+}
+// ===================== END OF NETWORK INTERACTIONS =====================
