@@ -14,8 +14,8 @@ _<img src="./assets/scs_3.png" width="32%"/>_
 ## installation
 
 - download the extension for your browser:
-  - [chrome](https://chrome.google.com/webstore/detail/humanmade/cfplkgejblmldlnpcgghomjbgmfbibjo)
-  - [firefox](https://addons.mozilla.org/en-US/firefox/addon/humanmade/)
+  - [chrome](https://chromewebstore.google.com/detail/humanmade/faakembllokimdogbphaajopgpffmloa)
+  - [firefox (coming end of the week)](https://firefox.com/)
 
 ### contribute
 

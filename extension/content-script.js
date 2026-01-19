@@ -235,6 +235,15 @@ const ratingTypes = [
   },
 ];
 
+function getChannelId() {
+  const elOwner = document.querySelector("#owner a");
+  return elOwner
+    ?.getAttribute("href")
+    .split("/")
+    .find((part) => part.startsWith("@"))
+    .replaceAll("@", "");
+}
+
 function _asTypes(score) {
   function _avgAsType(avg) {
     if (avg == null) return null;
@@ -264,8 +273,8 @@ function _scoreToType(score) {
     0,
     Math.min(
       2,
-      Math.round((score.ai_audio + score.ai_visual + score.ai_text) / 3)
-    )
+      Math.round((score.ai_audio + score.ai_visual + score.ai_text) / 3),
+    ),
   );
 }
 
@@ -276,6 +285,7 @@ const ids = {
 };
 
 let renderUnmount = null;
+let channelIdCache = null;
 
 window.addEventListener("load", () => {
   logger.info("content script loaded");
@@ -283,7 +293,10 @@ window.addEventListener("load", () => {
   const observer = new MutationObserver((mutationsList, observer) => {
     for (const mutation of mutationsList) {
       if (mutation.type === "childList") {
-        logger.info("#owner element changed, re-adding channel icon");
+        const channelId = getChannelId();
+        if (channelId === channelIdCache) continue;
+        channelIdCache = channelId;
+        logger.info(`channel changed (${channelId}): re-rendering`);
         renderPage();
       }
     }
@@ -322,317 +335,311 @@ function renderPage() {
     document.body.appendChild(dialogRoot);
   }
 
-  logger.info("rendering modal dialog");
+  logger.info("rendering...");
 
-  render(dialogRoot, "well", ({ c, state, setState, useEffect }) => {
-    function getChannelId() {
-      const elOwner = document.querySelector("#owner a");
-      return elOwner
-        ?.getAttribute("href")
-        .split("/")
-        .find((part) => part.startsWith("@"))
-        .replaceAll("@", "");
-    }
-
-    function loadScoreAndSet(channelName) {
-      if (!channelName) return;
-      networkScore(channelName, (data) => {
-        setState({ score: data.score, userRated: data.user_rated ?? false });
-        setChannelIconType(_scoreToType(data.score));
-      });
-    }
-
-    useEffect(async () => {
-      while (!document.querySelector("#owner")) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+  renderUnmount = render(
+    dialogRoot,
+    "well",
+    ({ c, state, setState, useEffect }) => {
+      function loadScoreAndSet(channelName) {
+        if (!channelName) return;
+        networkScore(channelName, (data) => {
+          setState({ score: data.score, userRated: data.user_rated ?? false });
+          setChannelIconType(_scoreToType(data.score));
+        });
       }
-      logger.info("page ready - adding channel icon");
-      addChannelIcon(() => setState({ dialogOpen: true }));
-      setChannelIconType(3); // unknown at first
 
-      // load channel info:
-      const channelName = getChannelId();
-      setState({ channelName: channelName });
-      loadScoreAndSet(channelName);
-    });
+      useEffect(async () => {
+        while (!document.querySelector("#owner")) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        addChannelIcon(() => setState({ dialogOpen: true }));
+        setChannelIconType(3); // unknown at first
 
-    function LickertScale(p) {
-      const options = ["AI", "MIXED", "HUMAN"];
-
-      const selectedType = ratingTypes[p.value] ?? ratingTypes[3];
-
-      return c.Column({
-        style: "gap: 8px;",
-        inner: [
-          c.TextHint({
-            inner: `The ${p.label} <span style="font-weight: bold;">usually</span> are:`,
-            style: "color: white;",
-          }),
-          c.Row({
-            id: p.id,
-            style: [
-              "gap: 0px",
-              "justify-content: space-between",
-              `border: 2px solid ${selectedType.color}`,
-              "border-radius: 4px",
-              "overflow: hidden",
-              "padding: 0",
-            ],
-            inner: options.map((option, i) =>
-              c.Button({
-                inner: option,
-                onClick: () => p.onChange?.(i),
-                style: [
-                  "flex: 1",
-                  "margin: 0",
-                  "border: none",
-                  "border-radius: 0",
-                  `${
-                    i === p.value
-                      ? `background: ${selectedType.color};`
-                      : "background: transparent;"
-                  }`,
-                ],
-              })
-            ),
-          }),
-        ],
+        // load channel info:
+        const channelName = getChannelId();
+        setState({ channelName: channelName });
+        loadScoreAndSet(channelName);
       });
-    }
 
-    function Header() {
-      const height = `24`;
-      return c.Row({
-        inner: [
-          c.Image({
-            src: chrome.runtime.getURL(`/assets/icons/github.svg`),
-            onClick: () =>
-              window.open("https://github.com/RobinNaumann/humanmade/"),
-            style: [
-              "margin: 16px",
-              "margin-bottom: 0",
-              "cursor: pointer",
-              `height: ${height}px`,
-            ],
-          }),
-          c.Image({
-            src: chrome.runtime.getURL(`/assets/humanmade_dark.png`),
-            style: [
-              "margin: 16px",
-              "margin-bottom: 0",
-              `height: ${height}px`,
-              "flex: 1",
-            ],
-          }),
-          c.Image({
-            src: chrome.runtime.getURL(`/assets/icons/x.svg`),
-            onClick: () => setState({ dialogOpen: false }),
-            style: [
-              "margin: 16px",
-              "margin-bottom: 0",
-              "cursor: pointer",
-              `height: ${height}px`,
-            ],
-          }),
-        ],
-      });
-    }
+      function LickertScale(p) {
+        const options = ["AI", "MIXED", "HUMAN"];
 
-    function ScoreCard() {
-      const scores = _asTypes(state.score);
+        const selectedType = ratingTypes[p.value] ?? ratingTypes[3];
 
-      return c.Card({
-        style: "gap: 4px",
-        inner: [
-          c.Text({
-            inner: "current rating",
-            style: "font-weight: bold; font-size: 16px; ",
-          }),
-          c.TextHint({
-            inner: `videos of the channel ${
-              state.channelName ?? "?"
-            } have been rated by other users as:`,
-            style: "margin-bottom: 16px;",
-          }),
-          !scores
-            ? c.Text({
-                inner: "no ratings yet",
-                style: "font-style: italic; color: #ccc; text-align: center;",
-              })
-            : c.Row({
-                inner: Object.entries(scores).map(([key, val]) =>
-                  c.LabelValue({
-                    label: key,
-                    value: val.key.toUpperCase(),
-                    style: [`color: ${val.color}`],
-                    title: val.label,
-                  })
-                ),
-              }),
-        ],
-      });
-    }
-
-    function RateCard() {
-      const hasRated = state.userRated ?? false;
-
-      return c.Card({
-        style: "gap: 4px",
-        inner: hasRated
-          ? [
-              c.Text({
-                inner: "rating has already been submitted",
-                style:
-                  "font-weight: bold; font-size: 16px; text-align: center;",
-              }),
-              c.TextHint({
-                inner: "by you or a user at your IP address. Thanks!",
-                style: " text-align: center;",
-              }),
-            ]
-          : [
-              c.Text({
-                inner: "submit rating & help others",
-                style: "font-weight: bold; font-size: 16px; ",
-              }),
-              c.TextHint({
-                inner: `consider an average video of the channel ${
-                  state.channelName ?? "--"
-                }`,
-                style: "margin-bottom: 16px;",
-              }),
-              c.Column({
-                inner: [
-                  LickertScale({
-                    id: "humanmade-lickert-audio",
-                    label: "audio / speech",
-                    value: state.rating?.ai_audio,
-                    onChange: (val) =>
-                      setState({
-                        ...state,
-                        rating: { ...state.rating, ai_audio: val },
-                      }),
-                  }),
-                  LickertScale({
-                    id: "humanmade-lickert-visual",
-                    label: "visuals / imagery",
-                    value: state.rating?.ai_visual,
-                    onChange: (val) =>
-                      setState({
-                        ...state,
-                        rating: { ...state.rating, ai_visual: val },
-                      }),
-                  }),
-                  LickertScale({
-                    id: "humanmade-lickert-text",
-                    label: "content / script",
-                    value: state.rating?.ai_text,
-                    onChange: (val) =>
-                      setState({
-                        ...state,
-                        rating: { ...state.rating, ai_text: val },
-                      }),
-                  }),
-                ],
-              }),
-              c.Button({
-                id: "humanmade-modal-close",
-                inner: "submit rating",
-                style: [
-                  "flex: 1; margin-top: 16px",
-                  (state?.rating?.ai_audio ?? null) === null ||
-                  (state?.rating?.ai_visual ?? null) === null ||
-                  (state?.rating?.ai_text ?? null) === null
-                    ? "background: #888;"
-                    : "",
-                ],
-
-                onClick: () => {
-                  if (
-                    !state.channelName ||
-                    !state.rating ||
-                    (state.rating.ai_audio ?? null) === null ||
-                    (state.rating.ai_visual ?? null) === null ||
-                    (state.rating.ai_text ?? null) === null
-                  ) {
-                    showToast("❌ add all ratings");
-                    return;
-                  }
-
-                  networkRate(state.channelName, state.rating)
-                    .then(() => {
-                      showToast("✅ Thank you for your rating!");
-                      setState({ userRated: true, rating: null });
-                      loadScoreAndSet(state.channelName);
-                    })
-                    .catch((e) => {
-                      setState({ rating: null });
-                      logger.error("error submitting rating", e);
-                      showToast("❌ could not submit rating");
-                    });
-                },
-              }),
-            ],
-      });
-    }
-
-    return c.Element({
-      onClick: () => setState({ dialogOpen: false }),
-      style: [
-        "position: fixed;",
-        "top: 0;",
-        "left: 0;",
-        "width: 100%;",
-        "height: 100%;",
-        "background: rgba(0,0,0,0.5);",
-        "backdrop-filter: blur(4px);",
-        "z-index: 10001;",
-        `display: ${state.dialogOpen ? "flex" : "none"}`,
-        "justify-content: center;",
-        "align-items: center;",
-      ],
-      inner: [
-        c.Element({
-          onClick: (e) => {
-            e.stopPropagation();
-          },
-          id: "humanmade-modal-dialog",
-          style: [
-            "font-family: Arial, Helvetica, sans-serif;",
-            "font-size: 16px;",
-            "color: #fff;",
-            "background: #444;",
-            "border: 2px solid #333;",
-            "border-radius: 8px;",
-            // large shadow for prominence:
-            "box-shadow: 0 4px 32px rgba(0,0,0,.5);",
-            "width: 400px",
-          ],
+        return c.Column({
+          style: "gap: 8px;",
           inner: [
-            c.Column({
-              style: ["height: 480px", "max-height: 480px"],
-              inner: [
-                Header(),
-                c.Column({
-                  scrollable: true,
-                  style: ["padding: 16px", "padding-top: 0", "gap: 24px"],
-                  inner: [
-                    c.Text({
-                      inner:
-                        "This extension lets you rate the extent to which content is human-made.",
-                      style: "text-align: center;",
-                    }),
-                    ScoreCard(),
-                    RateCard(),
+            c.TextHint({
+              inner: `The ${p.label} <span style="font-weight: bold;">usually</span> are:`,
+              style: "color: white;",
+            }),
+            c.Row({
+              id: p.id,
+              style: [
+                "gap: 0px",
+                "justify-content: space-between",
+                `border: 2px solid ${selectedType.color}`,
+                "border-radius: 4px",
+                "overflow: hidden",
+                "padding: 0",
+              ],
+              inner: options.map((option, i) =>
+                c.Button({
+                  inner: option,
+                  onClick: () => p.onChange?.(i),
+                  style: [
+                    "flex: 1",
+                    "margin: 0",
+                    "border: none",
+                    "border-radius: 0",
+                    `${
+                      i === p.value
+                        ? `background: ${selectedType.color};`
+                        : "background: transparent;"
+                    }`,
                   ],
                 }),
+              ),
+            }),
+          ],
+        });
+      }
+
+      function Header() {
+        const height = `24`;
+        return c.Row({
+          inner: [
+            c.Image({
+              src: chrome.runtime.getURL(`/assets/icons/github.svg`),
+              onClick: () =>
+                window.open("https://github.com/RobinNaumann/humanmade/"),
+              style: [
+                "margin: 16px",
+                "margin-bottom: 0",
+                "cursor: pointer",
+                `height: ${height}px`,
+              ],
+            }),
+            c.Image({
+              src: chrome.runtime.getURL(`/assets/humanmade_dark.png`),
+              style: [
+                "margin: 16px",
+                "margin-bottom: 0",
+                `height: ${height}px`,
+                "flex: 1",
+              ],
+            }),
+            c.Image({
+              src: chrome.runtime.getURL(`/assets/icons/x.svg`),
+              onClick: () => setState({ dialogOpen: false }),
+              style: [
+                "margin: 16px",
+                "margin-bottom: 0",
+                "cursor: pointer",
+                `height: ${height}px`,
               ],
             }),
           ],
-        }),
-      ],
-    });
-  });
+        });
+      }
+
+      function ScoreCard() {
+        const scores = _asTypes(state.score);
+
+        return c.Card({
+          style: "gap: 4px",
+          inner: [
+            c.Text({
+              inner: "current rating",
+              style: "font-weight: bold; font-size: 16px; ",
+            }),
+            c.TextHint({
+              inner: `videos of the channel ${
+                state.channelName ?? "?"
+              } have been rated by other users as:`,
+              style: "margin-bottom: 16px;",
+            }),
+            !scores
+              ? c.Text({
+                  inner: "no ratings yet",
+                  style: "font-style: italic; color: #ccc; text-align: center;",
+                })
+              : c.Row({
+                  inner: Object.entries(scores).map(([key, val]) =>
+                    c.LabelValue({
+                      label: key,
+                      value: val.key.toUpperCase(),
+                      style: [`color: ${val.color}`],
+                      title: val.label,
+                    }),
+                  ),
+                }),
+          ],
+        });
+      }
+
+      function RateCard() {
+        const hasRated = state.userRated ?? false;
+
+        return c.Card({
+          style: "gap: 4px",
+          inner: hasRated
+            ? [
+                c.Text({
+                  inner: "rating has already been submitted",
+                  style:
+                    "font-weight: bold; font-size: 16px; text-align: center;",
+                }),
+                c.TextHint({
+                  inner: "by you or a user at your IP address. Thanks!",
+                  style: " text-align: center;",
+                }),
+              ]
+            : [
+                c.Text({
+                  inner: "submit rating & help others",
+                  style: "font-weight: bold; font-size: 16px; ",
+                }),
+                c.TextHint({
+                  inner: `consider an average video of the channel ${
+                    state.channelName ?? "--"
+                  }`,
+                  style: "margin-bottom: 16px;",
+                }),
+                c.Column({
+                  inner: [
+                    LickertScale({
+                      id: "humanmade-lickert-audio",
+                      label: "audio / speech",
+                      value: state.rating?.ai_audio,
+                      onChange: (val) =>
+                        setState({
+                          ...state,
+                          rating: { ...state.rating, ai_audio: val },
+                        }),
+                    }),
+                    LickertScale({
+                      id: "humanmade-lickert-visual",
+                      label: "visuals / imagery",
+                      value: state.rating?.ai_visual,
+                      onChange: (val) =>
+                        setState({
+                          ...state,
+                          rating: { ...state.rating, ai_visual: val },
+                        }),
+                    }),
+                    LickertScale({
+                      id: "humanmade-lickert-text",
+                      label: "content / script",
+                      value: state.rating?.ai_text,
+                      onChange: (val) =>
+                        setState({
+                          ...state,
+                          rating: { ...state.rating, ai_text: val },
+                        }),
+                    }),
+                  ],
+                }),
+                c.Button({
+                  id: "humanmade-modal-close",
+                  inner: "submit rating",
+                  style: [
+                    "flex: 1; margin-top: 16px",
+                    (state?.rating?.ai_audio ?? null) === null ||
+                    (state?.rating?.ai_visual ?? null) === null ||
+                    (state?.rating?.ai_text ?? null) === null
+                      ? "background: #888;"
+                      : "",
+                  ],
+
+                  onClick: () => {
+                    if (
+                      !state.channelName ||
+                      !state.rating ||
+                      (state.rating.ai_audio ?? null) === null ||
+                      (state.rating.ai_visual ?? null) === null ||
+                      (state.rating.ai_text ?? null) === null
+                    ) {
+                      showToast("❌ add all ratings");
+                      return;
+                    }
+
+                    networkRate(state.channelName, state.rating)
+                      .then(() => {
+                        showToast("✅ Thank you for your rating!");
+                        setState({ userRated: true, rating: null });
+                        loadScoreAndSet(state.channelName);
+                      })
+                      .catch((e) => {
+                        setState({ rating: null });
+                        logger.error("error submitting rating", e);
+                        showToast("❌ could not submit rating");
+                      });
+                  },
+                }),
+              ],
+        });
+      }
+
+      return c.Element({
+        onClick: () => setState({ dialogOpen: false }),
+        style: [
+          "position: fixed;",
+          "top: 0;",
+          "left: 0;",
+          "width: 100%;",
+          "height: 100%;",
+          "background: rgba(0,0,0,0.5);",
+          "backdrop-filter: blur(4px);",
+          "z-index: 10001;",
+          `display: ${state.dialogOpen ? "flex" : "none"}`,
+          "justify-content: center;",
+          "align-items: center;",
+        ],
+        inner: [
+          c.Element({
+            onClick: (e) => {
+              e.stopPropagation();
+            },
+            id: "humanmade-modal-dialog",
+            style: [
+              "font-family: Arial, Helvetica, sans-serif;",
+              "font-size: 16px;",
+              "color: #fff;",
+              "background: #444;",
+              "border: 2px solid #333;",
+              "border-radius: 8px;",
+              // large shadow for prominence:
+              "box-shadow: 0 4px 32px rgba(0,0,0,.5);",
+              "width: 400px",
+            ],
+            inner: [
+              c.Column({
+                style: ["height: 480px", "max-height: 480px"],
+                inner: [
+                  Header(),
+                  c.Column({
+                    scrollable: true,
+                    style: ["padding: 16px", "padding-top: 0", "gap: 24px"],
+                    inner: [
+                      c.Text({
+                        inner:
+                          "This extension lets you rate the extent to which content is human-made.",
+                        style: "text-align: center;",
+                      }),
+                      ScoreCard(),
+                      RateCard(),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      });
+    },
+  );
 }
 
 function showToast(message, duration = 3000) {
@@ -662,7 +669,8 @@ function showToast(message, duration = 3000) {
 }
 
 function addChannelIcon(onTap) {
-  if (document.querySelector(`#${ids.avatarBase}`)) return;
+  // remove existing
+  document.querySelector(`#${ids.avatarBase}`)?.remove();
 
   const elOwner = document.querySelector("#owner");
   const elAvatar = document.querySelector("#avatar");
@@ -685,7 +693,9 @@ function addChannelIcon(onTap) {
   elBase.style.display = "none";
   elBase.style.position = "relative";
   elBase.addEventListener("click", (e) => {
-    logger.info("avatar circle clicked");
+    logger.info(
+      `avatar circle clicked with ${onTap ? "handler" : "no handler"}`,
+    );
     e.stopPropagation();
     e.preventDefault();
     onTap?.();
@@ -742,7 +752,7 @@ function setChannelIconType(type) {
 async function networkScore(channelId, onRes) {
   try {
     const res = await fetch(
-      `${_API_BASE_URL}/score/?type=yc&target=${channelId}`
+      `${_API_BASE_URL}/score/?type=yc&target=${channelId}`,
     );
     if (!res.ok) {
       logger.warn("error fetching channel rating, status not ok", res.status);

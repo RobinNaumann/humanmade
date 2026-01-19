@@ -7,7 +7,7 @@
         "48": "/assets/favicon.png",
         "128": "/assets/favicon.png"
     },
-    "version": "0.4.3",
+    "version": "0.4.4",
     "description": "Crowdsourced labeling of AI-generated content on YouTube. Help to highlight channels made by humans for humans.",
     "permissions": [],
     "web_accessible_resources": [
