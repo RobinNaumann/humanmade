@@ -1,6 +1,6 @@
-FROM --platform=linux/amd64 oven/bun
+FROM oven/bun
 
-LABEL version="0.0.42"
+LABEL version="0.2.4"
 
 RUN mkdir /build
 WORKDIR /build

@@ -2,6 +2,7 @@ import { useServerCallsWithAuth } from "donau/servercalls/client";
 import { useServerChannels } from "donau/serverchannels/client";
 
 import {
+  AssetLogo,
   Button,
   ElbeApp,
   Icons,
@@ -30,18 +31,24 @@ export const { makeServerCall, serverAuth } = useServerCallsWithAuth(
       loginArgs: { username: "", password: "" },
       userModel: {} as UserModel,
     },
-  }
+  },
 );
 
 // you can define localized strings that automatically adapt to
 // the browsers language
 export const L10n = makeL10n(
   { en_US: { tagline: "easily write web apps with server logic." } },
-  { de_DE: { tagline: "Schreibe Web-Apps mit Server-Logik." } }
+  { de_DE: { tagline: "Schreibe Web-Apps mit Server-Logik." } },
 );
 
 const _themeContext = makeThemeContext({
-  seed: { color: { accent: "#E85A53" } },
+  seed: {
+    color: { accent: "#E85A53", base: "#f4e7e6" },
+    type: {
+      body: { family: ["Averia Serif"], bold: false, size: 1.1 },
+      heading: { family: ["Averia Serif"], bold: true, size: 2.3 },
+    },
+  },
 });
 export const { useTheme, WithTheme } = _themeContext;
 
@@ -66,9 +73,8 @@ function App() {
               },
             },
           })}
-          icons={{
-            logo: "/assets/humanmade_light.png",
-            logoDark: "/assets/humanmade_dark.png",
+          branding={{
+            logo: <AssetLogo src="/assets/favicon.png" height={2.2} />,
           }}
           footer={<AppFooter />}
           globalActions={[
@@ -101,5 +107,5 @@ function App() {
 renderElbe(
   <StrictMode>
     <App />
-  </StrictMode>
+  </StrictMode>,
 );

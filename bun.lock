@@ -9,7 +9,7 @@
         "@types/react-dom": "^19.2.3",
         "concurrently": "^9.2.1",
         "donau": "1.0.12",
-        "elbe-ui": "^2.0.11",
+        "elbe-ui": "^2.0.12",
         "express": "^5.2.1",
         "jiti": "^2.6.1",
         "kolorist": "^1.8.0",
@@ -469,7 +469,7 @@
 
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
 
-    "elbe-ui": ["elbe-ui@2.0.11", "", { "dependencies": { "colors-convert": "^1.4.1", "lucide-react": "^0.561.0", "react-markdown": "^10.1.0", "wouter": "^3.8.1" }, "peerDependencies": { "@types/react-dom": "^19.2.3", "react": "^19.2.3", "react-dom": "^19.2.3", "typescript": "^5.9.3" } }, "sha512-4p/X7IpiAewZW6DhuNHyrJneG4r/UBfFj/8GQTKL+MGQKfPhPYyjmckWNtLfdatKe51jOY6wF1qH3YMNN7cblg=="],
+    "elbe-ui": ["elbe-ui@2.0.12", "", { "dependencies": { "colors-convert": "^1.4.1", "lucide-react": "^0.561.0", "react-markdown": "^10.1.0", "wouter": "^3.8.1" }, "peerDependencies": { "@types/react-dom": "^19.2.3", "react": "^19.2.3", "react-dom": "^19.2.3", "typescript": "^5.9.3" } }, "sha512-KgWhca+6APy2BaC1Df8ph+Eoby0UbJJYM1x50q4ZWf6Sg/43gk5X9U53dsn3UG/b6FzGBG0QPVAIChx25Umlsg=="],
 
     "electron-to-chromium": ["electron-to-chromium@1.5.267", "", {}, "sha512-0Drusm6MVRXSOJpGbaSVgcQsuB4hEkMpHXaVstcPmhu5LIedxs1xNK/nIxmQIU/RPC0+1/o0AVZfBTkTNJOdUw=="],
 

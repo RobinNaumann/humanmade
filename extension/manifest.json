@@ -40,5 +40,16 @@
             ],
             "run_at": "document_end"
         }
-    ]
+    ],
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "@humanmade",
+            "strict_min_version": "120.0",
+            "data_collection_permissions": {
+                "required": [
+                    "none"
+                ]
+            }
+        }
+    }
 }
