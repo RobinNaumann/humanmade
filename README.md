@@ -1,6 +1,8 @@
-# humanMade _<img src="./public/assets/favicon.png" width="40" align="right"/>_
+# humanmade _<img src="./public/assets/favicon.png" width="40" align="right"/>_
 
 A browser extension to crowdsource the labeling of AI-generated content on YouTube. Help to highlight channels made by humans for humans.
+
+Check it out **[here](https://humanmade.robbb.in)**.
 
 ## features
 
@@ -15,7 +17,7 @@ _<img src="./assets/scs_3.png" width="32%"/>_
 
 - download the extension for your browser:
   - [chrome](https://chromewebstore.google.com/detail/humanmade/faakembllokimdogbphaajopgpffmloa)
-  - [firefox (coming end of the week)](https://firefox.com/)
+  - [firefox](https://addons.mozilla.org/de/firefox/addon/humanmade/)
 
 ### contribute
 
