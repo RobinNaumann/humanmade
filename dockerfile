@@ -1,6 +1,6 @@
 FROM oven/bun
 
-LABEL version="0.2.4"
+LABEL version="0.2.5"
 
 RUN mkdir /build
 WORKDIR /build

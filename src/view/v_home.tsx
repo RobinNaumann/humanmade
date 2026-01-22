@@ -1,4 +1,5 @@
 import { Column, FlexLayout, Page, Row, Text, useLayoutMode } from "elbe-ui";
+import { moewe } from "moewe";
 import { appInfo } from "../shared/info.shared";
 import { AppFooter } from "./v_branding";
 
@@ -70,14 +71,20 @@ export function Home() {
 function _StoreLinks() {
   return (
     <Row gap={3} wrap main="center" style={{ marginBottom: "3rem" }}>
-      <a href={appInfo.store.cws}>
+      <a
+        href={appInfo.store.cws}
+        onClick={() => moewe().event("web_download_cws")}
+      >
         <img
           alt="Get it on Chrome Web Store"
           src="/assets/store/cws.png"
           style={{ height: "3.5rem" }}
         />
       </a>
-      <a href={appInfo.store.mozilla}>
+      <a
+        href={appInfo.store.mozilla}
+        onClick={() => moewe().event("web_download_mozilla")}
+      >
         <img
           alt="Get it on Firefox Add-ons"
           src="/assets/store/mozilla.png"

@@ -1,6 +1,6 @@
 export const appInfo = {
   name: "humanmade",
-  version: "0.2.4",
+  version: "0.2.5",
   description: "a tool for highlighting humanmade content",
   repository: "https://github.com/RobinNaumann/humanmade",
   social: {
